@@ -1,7 +1,7 @@
 # Adaptivegrain-rs
 Reimplementation of the adaptive\_grain mask as a Vapoursynth plugin.
 For a description of the math and the general idea,
-see [the article](https://kageru.moe/blog/article/adaptivegrain/).
+see [the article](https://blog.kageru.moe/legacy/adaptivegrain.html).
 
 ## Usage
 ```py
