@@ -1,19 +1,18 @@
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate vapoursynth;
-
 pub mod mask;
 
 use self::mask::Mask;
-use failure::Error;
-use vapoursynth::api::API;
-use vapoursynth::core::CoreRef;
-use vapoursynth::format::SampleType;
-use vapoursynth::map::Map;
-use vapoursynth::node::Node;
-use vapoursynth::plugins::{Filter, FilterArgument, Metadata};
-use vapoursynth::video_info::Property;
+use anyhow::{Error, bail};
+use vapoursynth::{
+    api::API,
+    core::CoreRef,
+    export_vapoursynth_plugin,
+    format::SampleType,
+    make_filter_function,
+    map::Map,
+    node::Node,
+    plugins::{Filter, FilterArgument, Metadata},
+    video_info::Property,
+};
 
 pub const PLUGIN_NAME: &str = "adaptivegrain";
 pub const PLUGIN_IDENTIFIER: &str = "moe.kageru.adaptivegrain";

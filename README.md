@@ -40,22 +40,11 @@ cargo build --release
 ```
 That’s it. This is Rust, after all.
 No idea what the minimum version is,
-   but it works with stable rust 1.41.
+   but it works with stable rust 1.83.
    That’s all I know.
 Binaries for Windows and Linux are in the release tab.
 
 ## FAQ
-**What’s the no-fma dll? Which one do I need?**
-
-There are two Windows builds of the plugin, one for CPUs that support
-   [FMA instructions](https://en.wikipedia.org/wiki/FMA_instruction_set) and one for those that don’t.  
-If your CPU is a Haswell (for Intel) or Piledriver (for AMD) or newer,
-   you can use the regular version (which is about 20% faster).
-Otherwise, grab no-fma.  
-The Linux build uses fma instructions.
-I trust that if you’re a Linux user on older hardware,
-  you know how to compile your own binaries.
-
 **Why do I have to call std.PlaneStats() manually?**
 
 ~~Because I didn’t want to reimplement it. `kagefunc.adaptive_grain(clip, show_mask=True)` does that for you and then just returns the mask.~~
@@ -66,4 +55,5 @@ I’ll fix that at some point.™
 
 I was going to do that originally,
   but I didn’t want to reimplement grain
-  when we already have a working grain filter.
+  when we already have a working grain filter
+  (multiple even, which gives you the option to choose whichever you want).

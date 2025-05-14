@@ -1,30 +1,25 @@
 use super::PLUGIN_NAME;
-use failure::Error;
+use anyhow::{Error, bail, format_err};
 use std::ptr;
-use vapoursynth::core::CoreRef;
-use vapoursynth::format::ColorFamily;
-use vapoursynth::plugins::{Filter, FrameContext};
-use vapoursynth::prelude::*;
-use vapoursynth::video_info::{Property, VideoInfo};
+use vapoursynth::{
+    core::CoreRef,
+    format::ColorFamily,
+    plugins::{Filter, FrameContext},
+    prelude::*,
+    video_info::{Property, VideoInfo},
+};
 
 pub struct Mask<'core> {
-    pub source: Node<'core>,
+    pub source:       Node<'core>,
     pub luma_scaling: f32,
 }
 
 #[rustfmt::skip]
-static FLOAT_RANGE: [f32; 256] = [0.0, 0.003921569, 0.007843138, 0.011764706, 0.015686275, 0.019607844, 0.023529412, 0.02745098, 0.03137255, 0.03529412, 0.039215688, 0.043137256, 0.047058824, 0.050980393, 0.05490196, 0.05882353, 0.0627451, 0.06666667, 0.07058824, 0.07450981, 0.078431375, 0.08235294, 0.08627451, 0.09019608, 0.09411765, 0.09803922, 0.101960786, 0.105882354, 0.10980392, 0.11372549, 0.11764706, 0.12156863, 0.1254902, 0.12941177, 0.13333334, 0.13725491, 0.14117648, 0.14509805, 0.14901961, 0.15294118, 0.15686275, 0.16078432, 0.16470589, 0.16862746, 0.17254902, 0.1764706, 0.18039216, 0.18431373, 0.1882353, 0.19215687, 0.19607843, 0.2, 0.20392157, 0.20784314, 0.21176471, 0.21568628, 0.21960784, 0.22352941, 0.22745098, 0.23137255, 0.23529412, 0.23921569, 0.24313726, 0.24705882, 0.2509804, 0.25490198, 0.25882354, 0.2627451, 0.26666668, 0.27058825, 0.27450982, 0.2784314, 0.28235295, 0.28627452, 0.2901961, 0.29411766, 0.29803923, 0.3019608, 0.30588236, 0.30980393, 0.3137255, 0.31764707, 0.32156864, 0.3254902, 0.32941177, 0.33333334, 0.3372549, 0.34117648, 0.34509805, 0.34901962, 0.3529412, 0.35686275, 0.36078432, 0.3647059, 0.36862746, 0.37254903, 0.3764706, 0.38039216, 0.38431373, 0.3882353, 0.39215687, 0.39607844, 0.4, 0.40392157, 0.40784314, 0.4117647, 0.41568628, 0.41960785, 0.42352942, 0.42745098, 0.43137255, 0.43529412, 0.4392157, 0.44313726, 0.44705883, 0.4509804, 0.45490196, 0.45882353, 0.4627451, 0.46666667, 0.47058824, 0.4745098, 0.47843137, 0.48235294, 0.4862745, 0.49019608, 0.49411765, 0.49803922, 0.5019608, 0.5058824, 0.50980395, 0.5137255, 0.5176471, 0.52156866, 0.5254902, 0.5294118, 0.53333336, 0.5372549, 0.5411765, 0.54509807, 0.54901963, 0.5529412, 0.5568628, 0.56078434, 0.5647059, 0.5686275, 0.57254905, 0.5764706, 0.5803922, 0.58431375, 0.5882353, 0.5921569, 0.59607846, 0.6, 0.6039216, 0.60784316, 0.6117647, 0.6156863, 0.61960787, 0.62352943, 0.627451, 0.6313726, 0.63529414, 0.6392157, 0.6431373, 0.64705884, 0.6509804, 0.654902, 0.65882355, 0.6627451, 0.6666667, 0.67058825, 0.6745098, 0.6784314, 0.68235296, 0.6862745, 0.6901961, 0.69411767, 0.69803923, 0.7019608, 0.7058824, 0.70980394, 0.7137255, 0.7176471, 0.72156864, 0.7254902, 0.7294118, 0.73333335, 0.7372549, 0.7411765, 0.74509805, 0.7490196, 0.7529412, 0.75686276, 0.7607843, 0.7647059, 0.76862746, 0.77254903, 0.7764706, 0.78039217, 0.78431374, 0.7882353, 0.7921569, 0.79607844, 0.8, 0.8039216, 0.80784315, 0.8117647, 0.8156863, 0.81960785, 0.8235294, 0.827451, 0.83137256, 0.8352941, 0.8392157, 0.84313726, 0.84705883, 0.8509804, 0.85490197, 0.85882354, 0.8627451, 0.8666667, 0.87058824, 0.8745098, 0.8784314, 0.88235295, 0.8862745, 0.8901961, 0.89411765, 0.8980392, 0.9019608, 0.90588236, 0.9098039, 0.9137255, 0.91764706, 0.92156863, 0.9254902, 0.92941177, 0.93333334, 0.9372549, 0.9411765, 0.94509804, 0.9490196, 0.9529412, 0.95686275, 0.9607843, 0.9647059, 0.96862745, 0.972549, 0.9764706, 0.98039216, 0.9843137, 0.9882353, 0.99215686, 0.99607843, 1.0];
+pub static FLOAT_RANGE: [f32; 256] = [0.0, 0.003921569, 0.007843138, 0.011764706, 0.015686275, 0.019607844, 0.023529412, 0.02745098, 0.03137255, 0.03529412, 0.039215688, 0.043137256, 0.047058824, 0.050980393, 0.05490196, 0.05882353, 0.0627451, 0.06666667, 0.07058824, 0.07450981, 0.078431375, 0.08235294, 0.08627451, 0.09019608, 0.09411765, 0.09803922, 0.101960786, 0.105882354, 0.10980392, 0.11372549, 0.11764706, 0.12156863, 0.1254902, 0.12941177, 0.13333334, 0.13725491, 0.14117648, 0.14509805, 0.14901961, 0.15294118, 0.15686275, 0.16078432, 0.16470589, 0.16862746, 0.17254902, 0.1764706, 0.18039216, 0.18431373, 0.1882353, 0.19215687, 0.19607843, 0.2, 0.20392157, 0.20784314, 0.21176471, 0.21568628, 0.21960784, 0.22352941, 0.22745098, 0.23137255, 0.23529412, 0.23921569, 0.24313726, 0.24705882, 0.2509804, 0.25490198, 0.25882354, 0.2627451, 0.26666668, 0.27058825, 0.27450982, 0.2784314, 0.28235295, 0.28627452, 0.2901961, 0.29411766, 0.29803923, 0.3019608, 0.30588236, 0.30980393, 0.3137255, 0.31764707, 0.32156864, 0.3254902, 0.32941177, 0.33333334, 0.3372549, 0.34117648, 0.34509805, 0.34901962, 0.3529412, 0.35686275, 0.36078432, 0.3647059, 0.36862746, 0.37254903, 0.3764706, 0.38039216, 0.38431373, 0.3882353, 0.39215687, 0.39607844, 0.4, 0.40392157, 0.40784314, 0.4117647, 0.41568628, 0.41960785, 0.42352942, 0.42745098, 0.43137255, 0.43529412, 0.4392157, 0.44313726, 0.44705883, 0.4509804, 0.45490196, 0.45882353, 0.4627451, 0.46666667, 0.47058824, 0.4745098, 0.47843137, 0.48235294, 0.4862745, 0.49019608, 0.49411765, 0.49803922, 0.5019608, 0.5058824, 0.50980395, 0.5137255, 0.5176471, 0.52156866, 0.5254902, 0.5294118, 0.53333336, 0.5372549, 0.5411765, 0.54509807, 0.54901963, 0.5529412, 0.5568628, 0.56078434, 0.5647059, 0.5686275, 0.57254905, 0.5764706, 0.5803922, 0.58431375, 0.5882353, 0.5921569, 0.59607846, 0.6, 0.6039216, 0.60784316, 0.6117647, 0.6156863, 0.61960787, 0.62352943, 0.627451, 0.6313726, 0.63529414, 0.6392157, 0.6431373, 0.64705884, 0.6509804, 0.654902, 0.65882355, 0.6627451, 0.6666667, 0.67058825, 0.6745098, 0.6784314, 0.68235296, 0.6862745, 0.6901961, 0.69411767, 0.69803923, 0.7019608, 0.7058824, 0.70980394, 0.7137255, 0.7176471, 0.72156864, 0.7254902, 0.7294118, 0.73333335, 0.7372549, 0.7411765, 0.74509805, 0.7490196, 0.7529412, 0.75686276, 0.7607843, 0.7647059, 0.76862746, 0.77254903, 0.7764706, 0.78039217, 0.78431374, 0.7882353, 0.7921569, 0.79607844, 0.8, 0.8039216, 0.80784315, 0.8117647, 0.8156863, 0.81960785, 0.8235294, 0.827451, 0.83137256, 0.8352941, 0.8392157, 0.84313726, 0.84705883, 0.8509804, 0.85490197, 0.85882354, 0.8627451, 0.8666667, 0.87058824, 0.8745098, 0.8784314, 0.88235295, 0.8862745, 0.8901961, 0.89411765, 0.8980392, 0.9019608, 0.90588236, 0.9098039, 0.9137255, 0.91764706, 0.92156863, 0.9254902, 0.92941177, 0.93333334, 0.9372549, 0.9411765, 0.94509804, 0.9490196, 0.9529412, 0.95686275, 0.9607843, 0.9647059, 0.96862745, 0.972549, 0.9764706, 0.98039216, 0.9843137, 0.9882353, 0.99215686, 0.99607843, 1.0];
 
 #[inline]
 pub fn get_mask_value(x: f32, luma_scaling: f32) -> f32 {
-    f32::powf(
-        1.0 - (x
-            * (x.mul_add(
-                x.mul_add(x.mul_add(x.mul_add(18.188, -45.47), 36.624), -9.466),
-                1.124,
-            ))),
-        luma_scaling,
-    )
+    f32::powf(1.0 - (x * (x.mul_add(x.mul_add(x.mul_add(x.mul_add(18.188, -45.47), 36.624), -9.466), 1.124))), luma_scaling)
 }
 
 #[inline]
@@ -45,16 +40,9 @@ macro_rules! int_filter {
     ($type:ty, $fname:ident) => {
         fn $fname(frame: &mut FrameRefMut, src_frame: FrameRef, depth: u8, luma_scaling: f32) {
             let max = ((1 << depth) - 1) as f32;
-            let lut: Vec<$type> = FLOAT_RANGE
-                .iter()
-                .map(|x| (get_mask_value(*x, luma_scaling) * max) as $type)
-                .collect();
+            let lut: Vec<$type> = FLOAT_RANGE.iter().map(|x| (get_mask_value(*x, luma_scaling) * max) as $type).collect();
             for row in 0..frame.height(0) {
-                for (pixel, src_pixel) in frame
-                    .plane_row_mut::<$type>(0, row)
-                    .iter_mut()
-                    .zip(src_frame.plane_row::<$type>(0, row))
-                {
+                for (pixel, src_pixel) in frame.plane_row_mut::<$type>(0, row).iter_mut().zip(src_frame.plane_row::<$type>(0, row)) {
                     let i = (src_pixel >> (depth - 8)) as usize;
                     unsafe {
                         ptr::write(pixel, lut[i].clone());
@@ -67,25 +55,17 @@ macro_rules! int_filter {
 
 fn filter_for_float(frame: &mut FrameRefMut, src_frame: FrameRef, luma_scaling: f32) {
     for row in 0..frame.height(0) {
-        frame
-            .plane_row_mut::<f32>(0, row)
-            .iter_mut()
-            .zip(src_frame.plane_row::<f32>(0, row))
-            .for_each(|(pixel, src_pixel)| unsafe {
-                ptr::write(pixel, get_mask_value(*src_pixel, luma_scaling));
-            });
+        frame.plane_row_mut::<f32>(0, row).iter_mut().zip(src_frame.plane_row::<f32>(0, row)).for_each(|(pixel, src_pixel)| unsafe {
+            ptr::write(pixel, get_mask_value(*src_pixel, luma_scaling));
+        });
     }
 }
 
 fn filter_for_float_clamping(frame: &mut FrameRefMut, src_frame: FrameRef, luma_scaling: f32) {
     for row in 0..frame.height(0) {
-        frame
-            .plane_row_mut::<f32>(0, row)
-            .iter_mut()
-            .zip(src_frame.plane_row::<f32>(0, row))
-            .for_each(|(pixel, src_pixel)| unsafe {
-                ptr::write(pixel, get_mask_value_clamping(*src_pixel, luma_scaling));
-            });
+        frame.plane_row_mut::<f32>(0, row).iter_mut().zip(src_frame.plane_row::<f32>(0, row)).for_each(|(pixel, src_pixel)| unsafe {
+            ptr::write(pixel, get_mask_value_clamping(*src_pixel, luma_scaling));
+        });
     }
 }
 
@@ -97,19 +77,11 @@ impl<'core> Filter<'core> for Mask<'core> {
             Property::Constant(format) => format,
         };
         vec![VideoInfo {
-            format: Property::Constant(
-                _core
-                    .register_format(
-                        ColorFamily::Gray,
-                        format.sample_type(),
-                        format.bits_per_sample(),
-                        0,
-                        0,
-                    )
-                    .unwrap(),
+            format:     Property::Constant(
+                _core.register_format(ColorFamily::Gray, format.sample_type(), format.bits_per_sample(), 0, 0).unwrap(),
             ),
-            flags: info.flags,
-            framerate: info.framerate,
+            flags:      info.flags,
+            framerate:  info.framerate,
             num_frames: info.num_frames,
             resolution: info.resolution,
         }]
@@ -126,32 +98,17 @@ impl<'core> Filter<'core> for Mask<'core> {
         Ok(None)
     }
 
-    fn get_frame(
-        &self,
-        _api: API,
-        core: CoreRef<'core>,
-        context: FrameContext,
-        n: usize,
-    ) -> Result<FrameRef<'core>, Error> {
+    fn get_frame(&self, _api: API, core: CoreRef<'core>, context: FrameContext, n: usize) -> Result<FrameRef<'core>, Error> {
         let new_format = from_property!(self.video_info(_api, core)[0].format);
-        let mut frame = unsafe {
-            FrameRefMut::new_uninitialized(
-                core,
-                None,
-                new_format,
-                from_property!(self.source.info().resolution),
-            )
-        };
-        let src_frame = self.source.get_frame_filter(context, n).ok_or_else(|| {
-            format_err!("Could not retrieve source frame. This shouldn’t happen.")
-        })?;
+        let mut frame = unsafe { FrameRefMut::new_uninitialized(core, None, new_format, from_property!(self.source.info().resolution)) };
+        let src_frame = self
+            .source
+            .get_frame_filter(context, n)
+            .ok_or_else(|| format_err!("Could not retrieve source frame. This shouldn’t happen."))?;
         let props = src_frame.props();
         let average = match props.get::<f64>("PlaneStatsAverage") {
             Ok(average) => average as f32,
-            Err(_) => bail!(format!(
-                "{}: you need to run std.PlaneStats on the clip before calling this function.",
-                PLUGIN_NAME
-            )),
+            Err(_) => bail!(format!("{}: you need to run std.PlaneStats on the clip before calling this function.", PLUGIN_NAME)),
         };
 
         match from_property!(self.source.info().format).sample_type() {
@@ -160,59 +117,29 @@ impl<'core> Filter<'core> for Mask<'core> {
                 match depth {
                     0..=8 => {
                         int_filter!(u8, filter_8bit);
-                        filter_8bit(
-                            &mut frame,
-                            src_frame,
-                            depth,
-                            calc_luma_scaling(average, self.luma_scaling),
-                        )
+                        filter_8bit(&mut frame, src_frame, depth, calc_luma_scaling(average, self.luma_scaling))
                     }
                     9..=16 => {
                         int_filter!(u16, filter_16bit);
-                        filter_16bit(
-                            &mut frame,
-                            src_frame,
-                            depth,
-                            calc_luma_scaling(average, self.luma_scaling),
-                        )
+                        filter_16bit(&mut frame, src_frame, depth, calc_luma_scaling(average, self.luma_scaling))
                     }
                     17..=32 => {
                         int_filter!(u32, filter_32bit);
-                        filter_32bit(
-                            &mut frame,
-                            src_frame,
-                            depth,
-                            calc_luma_scaling(average, self.luma_scaling),
-                        )
+                        filter_32bit(&mut frame, src_frame, depth, calc_luma_scaling(average, self.luma_scaling))
                     }
-                    _ => bail!(format!(
-                        "{}: input depth {} not supported",
-                        PLUGIN_NAME, depth
-                    )),
+                    _ => bail!(format!("{}: input depth {} not supported", PLUGIN_NAME, depth)),
                 }
             }
             SampleType::Float => {
                 // If the input has pixel values outside of the valid range (0-1),
                 // those might also be out of range in the output.
                 // We use the min/max props to determine if output clamping is necessary.
-                let max = props
-                    .get::<f64>("PlaneStatsMax")
-                    .expect(&format!("{}: no PlaneStatsMax in frame props", PLUGIN_NAME));
-                let min = props
-                    .get::<f64>("PlaneStatsMin")
-                    .expect(&format!("{}: no PlaneStatsMin in frame props", PLUGIN_NAME));
+                let max = props.get::<f64>("PlaneStatsMax").expect(&format!("{}: no PlaneStatsMax in frame props", PLUGIN_NAME));
+                let min = props.get::<f64>("PlaneStatsMin").expect(&format!("{}: no PlaneStatsMin in frame props", PLUGIN_NAME));
                 if max > 1.0 || min < 0.0 {
-                    filter_for_float_clamping(
-                        &mut frame,
-                        src_frame,
-                        calc_luma_scaling(average, self.luma_scaling),
-                    );
+                    filter_for_float_clamping(&mut frame, src_frame, calc_luma_scaling(average, self.luma_scaling));
                 } else {
-                    filter_for_float(
-                        &mut frame,
-                        src_frame,
-                        calc_luma_scaling(average, self.luma_scaling),
-                    );
+                    filter_for_float(&mut frame, src_frame, calc_luma_scaling(average, self.luma_scaling));
                 }
             }
         }
@@ -237,51 +164,22 @@ mod tests {
 
     #[test]
     fn test_mask_values() {
-        FLOAT_RANGE
-            .iter()
-            .zip(EXPECTED_MASK_02.iter())
-            .for_each(|(&x, &exp)| {
-                let value = get_mask_value(x, calc_luma_scaling(0.2, 10.0));
-                assert!(
-                    (value - exp).abs() < 0.0001,
-                    "luma scaling 0.2: Mask was wrong at position {}, expected {}, got {}",
-                    x,
-                    exp,
-                    value
-                );
-            });
-        FLOAT_RANGE
-            .iter()
-            .zip(EXPECTED_MASK_08.iter())
-            .for_each(|(&x, &exp)| {
-                let value = get_mask_value(x, calc_luma_scaling(0.8, 10.0));
-                assert!(
-                    (value - exp).abs() < 0.0001,
-                    "luma scaling 0.8: Mask was wrong at position {}, expected {}, got {}",
-                    x,
-                    exp,
-                    value
-                );
-            });
+        FLOAT_RANGE.iter().zip(EXPECTED_MASK_02.iter()).for_each(|(&x, &exp)| {
+            let value = get_mask_value(x, calc_luma_scaling(0.2, 10.0));
+            assert!((value - exp).abs() < 0.0001, "luma scaling 0.2: Mask was wrong at position {}, expected {}, got {}", x, exp, value);
+        });
+        FLOAT_RANGE.iter().zip(EXPECTED_MASK_08.iter()).for_each(|(&x, &exp)| {
+            let value = get_mask_value(x, calc_luma_scaling(0.8, 10.0));
+            assert!((value - exp).abs() < 0.0001, "luma scaling 0.8: Mask was wrong at position {}, expected {}, got {}", x, exp, value);
+        });
     }
 
     #[test]
     fn test_mask_values_clamping() {
-        FLOAT_RANGE
-            .iter()
-            .zip(EXPECTED_MASK_02.iter())
-            .for_each(|(&x, &exp)| {
-                assert!(
-                    (get_mask_value_clamping(x, calc_luma_scaling(0.2, 10.0)) - exp).abs() < 0.0001
-                );
-            });
-        assert_eq!(
-            get_mask_value_clamping(1.1, calc_luma_scaling(0.99, 10.0)),
-            0.0
-        );
-        assert_eq!(
-            get_mask_value_clamping(-0.1, calc_luma_scaling(-0.1, 10.0)),
-            1.0
-        );
+        FLOAT_RANGE.iter().zip(EXPECTED_MASK_02.iter()).for_each(|(&x, &exp)| {
+            assert!((get_mask_value_clamping(x, calc_luma_scaling(0.2, 10.0)) - exp).abs() < 0.0001);
+        });
+        assert_eq!(get_mask_value_clamping(1.1, calc_luma_scaling(0.99, 10.0)), 0.0);
+        assert_eq!(get_mask_value_clamping(-0.1, calc_luma_scaling(-0.1, 10.0)), 1.0);
     }
 }

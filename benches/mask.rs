@@ -1,5 +1,5 @@
 use adaptivegrain_rs::mask::*;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 fn mask_value(c: &mut Criterion) {
     black_box(FLOAT_RANGE.iter().count());

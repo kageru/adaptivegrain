@@ -1,19 +1,19 @@
 [package]
 name = "adaptivegrain-rs"
-version = "0.3.0"
+version = "0.3.2"
 authors = ["kageru"]
-edition = "2018"
+edition = "2024"
 
 [dependencies]
-failure = "0.1.8"
-vapoursynth = "0.3.0"
-vapoursynth-sys = "0.3.0"
+anyhow = "*"
+vapoursynth = "*"
+vapoursynth-sys = "*"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "*"
 
 [[bench]]
 name = "mask"
