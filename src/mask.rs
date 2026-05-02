@@ -3,7 +3,6 @@ use anyhow::{Error, bail, format_err};
 use std::ptr;
 use vapoursynth::{
     core::CoreRef,
-    format::ColorFamily,
     plugins::{Filter, FrameContext},
     prelude::*,
     video_info::{Property, VideoInfo},
@@ -70,20 +69,11 @@ fn filter_for_float_clamping(frame: &mut FrameRefMut, src_frame: FrameRef, luma_
 }
 
 impl<'core> Filter<'core> for Mask<'core> {
-    fn video_info(&self, _api: API, _core: CoreRef<'core>) -> Vec<VideoInfo<'core>> {
-        let info = self.source.info();
-        let format = match info.format {
-            Property::Variable => unreachable!(),
-            Property::Constant(format) => format,
-        };
+    fn video_info(&self, _api: API, core: CoreRef<'core>) -> Vec<VideoInfo<'core>> {
+        let format = self.source.info().format;
         vec![VideoInfo {
-            format:     Property::Constant(
-                _core.register_format(ColorFamily::Gray, format.sample_type(), format.bits_per_sample(), 0, 0).unwrap(),
-            ),
-            flags:      info.flags,
-            framerate:  info.framerate,
-            num_frames: info.num_frames,
-            resolution: info.resolution,
+            format: core.register_format(ColorFamily::Gray, format.sample_type(), format.bits_per_sample(), 0, 0).unwrap(),
+            ..self.source.info()
         }]
     }
 
@@ -98,9 +88,15 @@ impl<'core> Filter<'core> for Mask<'core> {
         Ok(None)
     }
 
-    fn get_frame(&self, _api: API, core: CoreRef<'core>, context: FrameContext, n: usize) -> Result<FrameRef<'core>, Error> {
-        let new_format = from_property!(self.video_info(_api, core)[0].format);
-        let mut frame = unsafe { FrameRefMut::new_uninitialized(core, None, new_format, from_property!(self.source.info().resolution)) };
+    fn get_frame(&self, api: API, core: CoreRef<'core>, context: FrameContext, n: usize) -> Result<FrameRef<'core>, Error> {
+        let mut frame = unsafe {
+            FrameRefMut::new_uninitialized(
+                core,
+                None,
+                self.video_info(api, core)[0].format,
+                from_property!(self.video_info(api, core)[0].resolution),
+            )
+        };
         let src_frame = self
             .source
             .get_frame_filter(context, n)
@@ -111,9 +107,9 @@ impl<'core> Filter<'core> for Mask<'core> {
             Err(_) => bail!(format!("{}: you need to run std.PlaneStats on the clip before calling this function.", PLUGIN_NAME)),
         };
 
-        match from_property!(self.source.info().format).sample_type() {
+        match self.source.info().format.sample_type() {
             SampleType::Integer => {
-                let depth = from_property!(self.source.info().format).bits_per_sample();
+                let depth = self.source.info().format.bits_per_sample();
                 match depth {
                     0..=8 => {
                         int_filter!(u8, filter_8bit);

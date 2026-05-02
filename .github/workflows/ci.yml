@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build-release:
+    name: build-release (${{ matrix.target }})
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: so
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+            ext: dll
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: dylib
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@main
+        with:
+          target: ${{ matrix.target }}
+          toolchain: nightly
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: -C target-cpu=haswell
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: adaptivegrain_rs-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/*adaptivegrain_rs.${{ matrix.ext }}
+  build-release-binaries:
+    uses: ./.github/workflows/build-release-binaries.yml
+
