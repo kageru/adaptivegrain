@@ -1,6 +1,6 @@
 [project]
 name = "vapoursynth-adaptivegrain"
-version = "0.4.1"
+version = "0.5.0"
 description = "adaptivegrain filter as a VapourSynth plugin."
 readme = "README.md"
 requires-python = ">=3.12"
