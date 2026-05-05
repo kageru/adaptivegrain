@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE.md"]
 
-dependencies = ["vapoursynth>=74"]
+dependencies = ["vapoursynth>=75"]
 
 [build-system]
 requires = ["hatchling==1.29.0", "packaging==26.2"]
