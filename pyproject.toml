@@ -43,5 +43,15 @@ before-all = "rustup target add x86_64-pc-windows-gnu"
 # VapourSynth's minimum macOS target is 13.0.
 MACOSX_DEPLOYMENT_TARGET = "13.0"
 
+[[tool.cibuildwheel.overrides]]
+select = "*-manylinux_x86_64"
+inherit.before-all = "append"
+inherit.environment = "append"
+before-all = [
+    "dnf install -y gcc-toolset-12",
+    "source /opt/rh/gcc-toolset-12/enable",
+]
+environment.PATH = "/opt/rh/gcc-toolset-12/root/usr/bin:$PATH"
+
 [project.urls]
 Homepage = "https://github.com/kageru/adaptivegrain"
