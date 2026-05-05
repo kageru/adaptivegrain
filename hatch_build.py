@@ -60,6 +60,9 @@ class CustomHook(BuildHookInterface[Any]):
         # Multiple target support
         if os.environ.get("ADG_MULTIPLE_TARGET", "").lower() in ["true", "1"] and target.cpus:
             print("Building multiple targets...", file=sys.stderr)
+
+            host_target_triple = get_host_target_triple()
+
             for cpu in target.cpus:
                 rust_flags = [f"-C target-cpu={cpu.name}"]
 
@@ -69,9 +72,13 @@ class CustomHook(BuildHookInterface[Any]):
                 env = os.environ.copy()
                 env["RUSTFLAGS"] = " ".join(rust_flags)
                 built_target_dir = Path(f"target/{cpu.name}")
-                subprocess.run(["cargo", "build", "--release", "--target-dir", built_target_dir], check=True, env=env)
+                subprocess.run(
+                    ["cargo", "build", "--release", "--target", host_target_triple, "--target-dir", built_target_dir],
+                    check=True,
+                    env=env,
+                )
 
-                built = built_target_dir / "release" / f"{target.prefix}{CRATE_NAME}{target.ext}"
+                built = built_target_dir / host_target_triple / "release" / f"{target.prefix}{CRATE_NAME}{target.ext}"
                 shutil.copy2(built, self.target_dir / Path(built.name).with_suffix(cpu.suffix + built.suffix))
 
             # Write a manifest to ensure instruction set-based loading works as desired
@@ -89,3 +96,12 @@ class CustomHook(BuildHookInterface[Any]):
 
     def finalize(self, version: str, build_data: dict[str, Any], artifact_path: str) -> None:
         shutil.rmtree(self.target_dir, ignore_errors=True)
+
+
+def get_host_target_triple() -> str:
+    """Query rustc for the host target triple (e.g. x86_64-unknown-linux-gnu)."""
+    result = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, check=True)
+    for line in result.stdout.splitlines():
+        if line.startswith("host:"):
+            return line.split(":", 1)[1].strip()
+    raise RuntimeError("Could not determine host target triple from `rustc -vV`")
