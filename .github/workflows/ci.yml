@@ -17,15 +17,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             ext: so
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            ext: so
           - os: windows-latest
             target: x86_64-pc-windows-gnu
             ext: dll
-          - os: macos-latest
+          - os: macos-26-intel
+            target: x86_64-apple-darwin
+            ext: dylib
+          - os: macos-26
             target: aarch64-apple-darwin
             ext: dylib
     runs-on: ${{ matrix.os }}

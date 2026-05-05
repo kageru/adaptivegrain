@@ -1,27 +1,47 @@
-# This entire file is copied from https://github.com/sgt0/vapoursynth-hysteresis/hatch_build.py
 from __future__ import annotations
 
+import os
 import platform
 import shutil
 import subprocess
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 from packaging import tags
 
-# Map OS to the shared library extension.
-LIB_EXTENSIONS = {
-    "Linux": "so",
-    "Windows": "dll",
-    "Darwin": "dylib",
-}
+CRATE_NAME = "adaptivegrain_rs"
 
-# Map OS to the shared library prefix.
-LIB_PREFIXES = {
-    "Linux": "lib",
-    "Windows": "",
-    "Darwin": "lib",
+
+class CPU(NamedTuple):
+    name: str
+    suffix: str
+    disable: str = ""
+
+
+class Target(NamedTuple):
+    prefix: str
+    ext: str
+    cpus: list[CPU] | None = None
+
+
+x86_64_CPUS = [
+    CPU("x86-64", ""),
+    CPU("haswell", ".avx2"),
+    CPU("znver4", ".zn4", disable="sse4a"),
+]
+
+TARGETS = {
+    "linux": {
+        "x86_64": Target("lib", ".so", x86_64_CPUS),
+        "aarch64": Target("lib", ".so"),
+    },
+    "windows": {"amd64": Target("", ".dll", x86_64_CPUS)},
+    "darwin": {
+        "x86_64": Target("lib", ".dylib", x86_64_CPUS[:-1]),
+        "arm64": Target("lib", ".dylib"),
+    },
 }
 
 
@@ -32,23 +52,40 @@ class CustomHook(BuildHookInterface[Any]):
         build_data["pure_python"] = False
         build_data["tag"] = f"py3-none-{next(tags.platform_tags())}"
 
-        os_name = platform.system()
-        arch = platform.machine()
-        ext = LIB_EXTENSIONS[os_name]
-        prefix = LIB_PREFIXES[os_name]
-        crate_name = "adaptivegrain"
-        lib_filename = f"{prefix}{crate_name}_rs.{ext}"
+        uname = platform.uname()
+        target = TARGETS[uname.system.lower()][uname.machine.lower()]
 
         self.target_dir.mkdir(parents=True, exist_ok=True)
 
-        env = dict(__import__("os").environ)
-        env["RUSTFLAGS"] = f"-C target-cpu=haswell"
+        # Multiple target support
+        if os.environ.get("ADG_MULTIPLE_TARGET", "").lower() in ["true", "1"] and target.cpus:
+            print("Building multiple targets...", file=sys.stderr)
+            for cpu in target.cpus:
+                rust_flags = [f"-C target-cpu={cpu.name}"]
 
-        cmd = ["cargo", "build", "--release"]
+                if cpu.disable:
+                    rust_flags.append(f" -C target-feature=-{cpu.disable}")
 
-        subprocess.run(cmd, check=True, env=env)
-        built = Path("target") / "release" / lib_filename
-        shutil.copy2(built, self.target_dir / lib_filename)
+                env = os.environ.copy()
+                env["RUSTFLAGS"] = " ".join(rust_flags)
+                built_target_dir = Path(f"target/{cpu.name}")
+                subprocess.run(["cargo", "build", "--release", "--target-dir", built_target_dir], check=True, env=env)
+
+                built = built_target_dir / "release" / f"{target.prefix}{CRATE_NAME}{target.ext}"
+                shutil.copy2(built, self.target_dir / Path(built.name).with_suffix(cpu.suffix + built.suffix))
+
+            # Write a manifest to ensure instruction set-based loading works as desired
+            # https://github.com/vapoursynth/vapoursynth/discussions/1196
+            (self.target_dir / "manifest.vs").write_text(f"[VapourSynth Manifest V1]\n{target.prefix}{CRATE_NAME}\n")
+        else:
+            # Build for *this* machine
+            env = os.environ.copy()
+            env["RUSTFLAGS"] = "-C target-cpu=native"
+
+            subprocess.run(["cargo", "build", "--release"], env=env)
+
+            built = Path("target") / "release" / f"{target.prefix}{CRATE_NAME}{target.ext}"
+            shutil.copy2(built, self.target_dir)
 
     def finalize(self, version: str, build_data: dict[str, Any], artifact_path: str) -> None:
-        shutil.rmtree(self.target_dir.parent, ignore_errors=True)
+        shutil.rmtree(self.target_dir, ignore_errors=True)
