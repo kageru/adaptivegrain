@@ -37,7 +37,7 @@ repair-wheel-command = "auditwheel repair --strip -w {dest_dir} {wheel}"
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]
-before-all = "rustup target add x86_64-pc-windows-gnu"
+before-all = "rustup target add x86_64-pc-windows-msvc"
 
 [tool.cibuildwheel.macos.environment]
 # VapourSynth's minimum macOS target is 13.0.
