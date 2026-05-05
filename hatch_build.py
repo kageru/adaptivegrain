@@ -47,16 +47,8 @@ class CustomHook(BuildHookInterface[Any]):
         cmd = ["cargo", "build", "--release"]
 
         subprocess.run(cmd, check=True, env=env)
-
         built = Path("target") / "release" / lib_filename
-
         shutil.copy2(built, self.target_dir / lib_filename)
-
-        manifest = self.target_dir / "manifest.vs"
-        manifest.write_text(
-            f"[VapourSynth Manifest V1]\n{prefix}{crate_name}\n",
-            encoding="utf-8",
-        )
 
     def finalize(self, version: str, build_data: dict[str, Any], artifact_path: str) -> None:
         shutil.rmtree(self.target_dir.parent, ignore_errors=True)
