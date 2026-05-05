@@ -3,13 +3,6 @@ name: Build release binaries
 on:
   workflow_call:
 
-permissions: {}
-
-env:
-  CIBW_BEFORE_ALL_LINUX: curl -sSf https://sh.rustup.rs | sh -s -- -y
-  CIBW_BEFORE_ALL_WINDOWS: rustup target add x86_64-pc-windows-gnu
-  CIBW_ENVIRONMENT_LINUX: "PATH=$HOME/.cargo/bin:$PATH"
-
 jobs:
   sdist:
     runs-on: ubuntu-24.04
