@@ -28,12 +28,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, windows-latest, macos-latest]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-26, macos-26-intel]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.1
+        env:
+          ADG_MULTIPLE_TARGET: "true"
+          CIBW_ENVIRONMENT_PASS_LINUX: ADG_MULTIPLE_TARGET
       - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.runner }}
