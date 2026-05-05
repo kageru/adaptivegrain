@@ -25,16 +25,18 @@ artifacts = [
 path = "hatch_build.py"
 
 [tool.cibuildwheel]
-skip = [
-    "*-musllinux_i686",   # Rust does not provide Cargo for musllinux 32-bit.
-    "*-musllinux_x86_64", # musllinux 64-bit does not support cdylib.
-]
+build-frontend = "build[uv]"
+build = "cp312-*"
+# Rust does not provide Cargo for musllinux 32-bit and 64-bit does not support cdylib.
+skip = ["*-musllinux*"]
 
 [tool.cibuildwheel.linux]
 before-all = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
 environment = "PATH=$HOME/.cargo/bin:$PATH"
+repair-wheel-command = "auditwheel repair --strip -w {dest_dir} {wheel}"
 
 [tool.cibuildwheel.windows]
+archs = ["AMD64"]
 before-all = "rustup target add x86_64-pc-windows-gnu"
 
 [tool.cibuildwheel.macos.environment]
