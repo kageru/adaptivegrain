@@ -30,9 +30,16 @@ skip = [
     "*-musllinux_x86_64", # musllinux 64-bit does not support cdylib.
 ]
 
+[tool.cibuildwheel.linux]
+before-all = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
+environment = "PATH=$HOME/.cargo/bin:$PATH"
+
+[tool.cibuildwheel.windows]
+before-all = "rustup target add x86_64-pc-windows-gnu"
+
 [tool.cibuildwheel.macos.environment]
-# Rust's minimum macOS target is 10.12.
-MACOSX_DEPLOYMENT_TARGET = "10.12"
+# VapourSynth's minimum macOS target is 13.0.
+MACOSX_DEPLOYMENT_TARGET = "13.0"
 
 [project.urls]
 Homepage = "https://github.com/kageru/adaptivegrain"
