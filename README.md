@@ -16,7 +16,7 @@ Since the output is grey and only luma is processed,
   the subsampling of the input does not matter.
 
 To replicate the original behaviour of adaptivegrain, a wrapper is provided in kagefunc.
-It behaves exactly like the original implementation
+The plugin behaves exactly like the original implementation
   (except for the performance, which is about 3x faster on my machine).
 
 ### Parameters
@@ -34,15 +34,16 @@ Lower values will make the mask brighter overall.
 ## Build instructions
 If you’re on Arch Linux,
   there’s an [AUR package](https://aur.archlinux.org/packages/vapoursynth-plugin-adaptivegrain-git/) for this plugin.
-Otherwise you’ll have to build and install the package manually.
+Otherwise you’ll have to build and install the package manually or use pip
 ```sh
 cargo build --release
+# or
+pip install vapoursynth-adaptivegrain
 ```
-That’s it. This is Rust, after all.
-No idea what the minimum version is,
-   but it works with stable rust 1.83.
-   That’s all I know.
-Binaries for Windows and Linux are in the release tab.
+Since version 0.4, binaries for Windows, Linux, and Mac are automatically published to pypi,
+so they’re no longer uploaded to the Github release tab.
+The Python packages include versions targetting different microarchitectures
+according to the selection introduced in Vapoursynth R75.
 
 ## FAQ
 **Why do I have to call std.PlaneStats() manually?**
